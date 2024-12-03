@@ -1,0 +1,110 @@
+ // sock.ev.on('messages.upsert', async m => {
+    //     console.log(JSON.stringify(m, undefined, 2))
+    //     const number = `6282291786044@s.whatsapp.net`;
+    //     // console.log(m);
+
+    //     console.log('replying to',number)
+    //     await sock.sendMessage(number, { text: 'Hello there!' })
+    //     // await sock.sendMessage(m.messages[0].key.remoteJid, { text: 'Hello there!' })
+    // })
+
+   const { MessageType, makeWASocket, DisconnectReason, useMultiFileAuthState } = require("@whiskeysockets/baileys");
+   const pino = require('pino');
+   const fs = require('fs');
+   
+   // Fungsi untuk menambahkan delay
+   function delay(ms) {
+       return new Promise(resolve => setTimeout(resolve, ms));
+   }
+   
+   async function connectToWhatsApp() {
+       const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+       const sock = makeWASocket({
+           printQRInTerminal: true,
+           auth: state,
+           // logger: pino({ level: 'debug' })
+       });
+   
+       sock.ev.on('connection.update', (update) => {
+           const { connection, lastDisconnect } = update;
+           if (connection === 'close' && lastDisconnect) {
+               const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
+               // console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
+               if (shouldReconnect) {
+                   connectToWhatsApp();
+               }
+           }
+       });
+   
+       sock.ev.on('creds.update', saveCreds);
+   
+       sock.ev.on('messages.upsert', async m => {
+           console.log(JSON.stringify(m, undefined, 2));
+   
+           // Kirim pesan ke grup
+           const groupID = "120363373250080918@g.us";  // ID grup
+           console.log('Sending message to group', groupID);
+   
+           // Kirim gambar ke grup
+           try {
+               const image = fs.readFileSync('images.jpg');
+               await sock.sendMessage(groupID, { image, caption: 'Hello from the group!' });
+               console.log('Image sent to group, waiting for 30 seconds...');
+               await delay(100000);  // Jeda 30 detik
+           } catch (err) {
+               console.log('Error sending image to group:', err);
+           }
+   
+           // Kirim video ke grup
+           try {
+               const video = fs.readFileSync('ma_gif.mp4');
+               await sock.sendMessage(groupID, {
+                   video,
+                   caption: "Video from the group!",
+                   gifPlayback: true
+               });
+               console.log('Video sent to group, waiting for 30 seconds...');
+               await delay(100000);  // Jeda 30 detik
+           } catch (err) {
+               console.log('Error sending video to group:', err);
+           }
+   
+           // Kirim pesan teks ke grup
+           await sock.sendMessage(groupID, { text: 'This is a text message to the group!' });
+   
+           // Kirim pesan ke pribadi
+           const personalNumber = `6282291786044@c.us`;  // Nomor pribadi
+           console.log('Sending message to personal number', personalNumber);
+   
+           // Kirim gambar ke pribadi
+           // try {
+           //     const image = fs.readFileSync('images.jpg');
+           //     await sock.sendMessage(personalNumber, { image, caption: 'Hello from personal message!' });
+           //     console.log('Image sent to personal, waiting for 30 seconds...');
+           //     await delay(30000);  // Jeda 30 detik
+           // } catch (err) {
+           //     console.log('Error sending image to personal:', err);
+           // }
+   
+           // // Kirim video ke pribadi
+           // try {
+           //     const video = fs.readFileSync('ma_gif.mp4');
+           //     await sock.sendMessage(personalNumber, {
+           //         video,
+           //         caption: "Video from personal message!",
+           //         gifPlayback: true
+           //     });
+           //     console.log('Video sent to personal, waiting for 30 seconds...');
+           //     await delay(30000);  // Jeda 30 detik
+           // } catch (err) {
+           //     console.log('Error sending video to personal:', err);
+           // }
+   
+           // // Kirim pesan teks ke pribadi
+           // await sock.sendMessage(personalNumber, { text: 'This is a text message to personal!' });
+       });
+   }
+   
+   // Jalankan fungsi utama
+   connectToWhatsApp();
+   
